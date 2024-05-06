@@ -7,10 +7,6 @@ date: "2024-05-03"
 knitr::opts_chunk$set(warning = FALSE, message = FALSE) 
 ```
 
-```{r, label = "git access token for updating, valid until 5.2025", echo = FALSE}
-# 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
-```
-
 First loading necessary packages - just in case I'm loading JAGS and stan, even though my main goal is to use stan, as it allows a more detailed approach:
 
 ```{r, label = "Package loading"}
