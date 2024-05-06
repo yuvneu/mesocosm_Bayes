@@ -1,29 +1,126 @@
 ---
-title: "bayesian models"
+title: "Monoculture Bayesian models"
 output: html_document
 date: "2024-05-03"
 ---
-
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+```{r setup, include=FALSE} 
+knitr::opts_chunk$set(warning = FALSE, message = FALSE) 
 ```
 
-## R Markdown
-
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
-
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
-
-```{r cars}
-summary(cars)
+```{r, label = "git access token for updating, valid until 5.2025", echo = FALSE}
+# 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
 ```
 
-## Including Plots
+First loading necessary packages - just in case I'm loading JAGS and stan, even though my main goal is to use stan, as it allows a more detailed approach:
 
-You can also embed plots, for example:
-
-```{r pressure, echo=FALSE}
-plot(pressure)
+```{r, label = "Package loading"}
+library(rstan)
+library(rjags)
+library(R2jags)
+library(rmutil)
+library(boot)
+library(loo)
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+## The data
+The data frames are in my R session thanks to the 'Monoculture data.Rmd' file. They are called H_123, B_123,.... The first letter is the species in question, and the '123' represent the 3 years that are shown. The DFs have a simple structure - 'Nt', 'yvalues' which is Nt+1/Nt, and 'year' which represents the year in which Nt+1 was sampled. 
+
+## Our goal
+We'll try and estimate $\lambda$ and $\alpha$, both parameters in the Beverton-Holt equation:
+
+\begingroup\Large
+\begin{equation*}
+\frac{N_{t+1}}{N_{t}} = \frac{\lambda}{1 + \alpha N}
+\end{equation*}
+\endgroup
+
+We'll approach this in a Bayesian framework, as it allows the incorporation of prior knowledge and an estimation of the uncertainty. 
+
+I'm first using JAGS. This is a simple model and it can probably handle it. The model itself will be written as: 
+
+```{r, label = "JAGS text"}
+jags_mono_model <- '
+model {
+  for(i in 1:N) {
+    y[i] ~ dnorm(lambda/(1+alpha*x[i]), residual_sd^-2)
+  }
+  lambda ~ dunif(0, 5000)
+  alpha ~ dunif(0, 4)
+  residual_sd ~ dunif(0, 1000)
+}
+'
+
+```
+
+Now I'll run the model for our most well-behaved species (Rumex), in the hope that the rest will follow:
+```{r, label = "Running the model for Rumex"}
+model_parameters <- c("lambda", "alpha", "residual_sd")
+
+rumex_model_run <- jags(data = list(N = nrow(R_123),
+                                    y = R_123$yvalues,
+                                    x = R_123$Nt),
+                        parameters.to.save = model_parameters,
+                        model.file = textConnection(jags_mono_model), 
+                        n.iter = 20000)
+
+rumex_posterior <- as.data.frame(rumex_model_run$BUGSoutput$sims.matrix)
+print(rumex_model_run)
+```
+
+
+```{r, label = "Print results", echo = FALSE}
+cat("Rumex DIC =", rumex_model_run[["BUGSoutput"]][["DIC"]])
+
+hist(rumex_posterior$alpha)
+hist(rumex_posterior$lambda)
+hist(rumex_posterior$residual_sd)
+hist(rumex_posterior$deviance)
+
+traceplot(rumex_model_run)
+
+rumex_al <- rumex_posterior[ , c("alpha", "lambda")]
+
+alphaq <- quantile(rumex_al$alpha, probs = seq(0, 1, by = 0.1))
+install.packages("hexbin")
+library(hexbin)
+library(ggplot2)
+
+h@count
+
+ggplot(rumex_al, aes(x = alpha, y = lambda)) + geom_hex(bins = 80) + 
+  scale_fill_gradient(low="lightblue1", high="darkblue") + 
+  theme(aspect.ratio = 1)
+```
+
+
+```{r, label = "Extracting WAIC", echo = FALSE}
+samples_normal <- jags.samples(rumex_model_run$model, 
+                           c("WAIC","deviance"), 
+                           type = "mean", 
+                           n.iter = 20000,
+                           n.burnin = 1000,
+                           n.thin = 1)
+samples_normal$p_waic <- samples_normal$WAIC
+samples_normal$waic <- samples_normal$deviance + samples_normal$p_waic
+tmp_normal <- sapply(samples_normal, sum)
+waic_normal <- round(c(waic = tmp_normal[["waic"]], 
+                       p_waic = tmp_normal[["p_waic"]]),1)
+
+samples_uni <- jags.samples(rumex_model_run_un$model, 
+                           c("WAIC","deviance"), 
+                           type = "mean", 
+                           n.iter = 20000,
+                           n.burnin = 1000,
+                           n.thin = 1)
+samples_uni$p_waic <- samples_uni$WAIC
+samples_uni$waic <- samples_uni$deviance + samples_uni$p_waic
+tmp_uni <- sapply(samples_uni, sum)
+waic_uni <- round(c(waic = tmp_uni[["waic"]], 
+                       p_waic = tmp_uni[["p_waic"]]),1)
+
+cat("Normal distribution WAIC =", as.numeric(waic_normal[1]), "\n")
+cat("Uniform distribution WAIC =", as.numeric(waic_uni[1]), "\n")
+
+
+
+```

@@ -1,0 +1,490 @@
+---
+title: "Monoculture data - years 1, 2, 3"
+output: html_document
+date: "2024-05-06"
+---
+
+```{r setup, include=FALSE} 
+knitr::opts_chunk$set(warning = FALSE, message = FALSE) 
+```
+
+```{r, label = "git access token for updating, valid until 5.2025", echo = FALSE}
+# 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
+```
+
+```{r, label = "Packages", echo = FALSE}
+library(dplyr)
+library(tidyr)
+```
+
+Here I will load the data and manipulate it. I'll be calculating the growth rate ('yvalues') for each pair of years, only for monocultures. First, years 1 and 2, we'll see Rumex DF's head:
+```{r, label = "Data manipulation, years 1 & 2", echo = FALSE}
+data0 <- read.csv("/Users/yuvalneumann/Documents/mesocosm_Bayes/raw_data/2022 abundance.csv")
+
+data1 <- read.csv("/Users/yuvalneumann/Documents/mesocosm_Bayes/raw_data/2023 abundance.csv")
+
+abund0 <- data0[, c("Plot", "Dominant", "Dominant_Species", "H", "B", "L",       
+                                  "T", "R", "O", "S", "trt", "year")]
+
+
+abund1 <- data1[, c("Plot", "Dominant", "Dominant_Species", "H", "B", "L",       
+                    "T", "R", "O", "S", "trt", "year")]
+
+abund01 <- rbind(abund0, abund1)
+
+#Take only the monoculture plots:
+monoabund01 <- subset(abund01, Dominant == 0)
+
+#Subset into seven species DFs:
+H_monoabund01 <- subset(monoabund01, Dominant_Species == "H")
+B_monoabund01 <- subset(monoabund01, Dominant_Species == "B")
+L_monoabund01 <- subset(monoabund01, Dominant_Species == "L")
+T_monoabund01 <- subset(monoabund01, Dominant_Species == "T")
+R_monoabund01 <- subset(monoabund01, Dominant_Species == "R")
+O_monoabund01 <- subset(monoabund01, Dominant_Species == "O")
+S_monoabund01 <- subset(monoabund01, Dominant_Species == "S")
+
+#Remove all other species columns:
+H_monoabund01 <- H_monoabund01[ , -c(2, 3, 5, 6, 7, 8, 9, 10)]
+B_monoabund01 <- B_monoabund01[ , -c(2, 3, 4, 6, 7, 8, 9, 10)]
+L_monoabund01 <- L_monoabund01[ , -c(2, 3, 4, 5, 7, 8, 9, 10)]
+T_monoabund01 <- T_monoabund01[ , -c(2, 3, 4, 5, 6, 8, 9, 10)]
+R_monoabund01 <- R_monoabund01[ , -c(2, 3, 4, 5, 6, 7, 9, 10)]
+O_monoabund01 <- O_monoabund01[ , -c(2, 3, 4, 5, 6, 7, 8, 10)]
+S_monoabund01 <- S_monoabund01[ , -c(2, 3, 4, 5, 6, 7, 8, 9)]
+
+#Make sure we got that right:
+#colnames(H_monoabund01)
+#colnames(B_monoabund01)
+#colnames(L_monoabund01)
+#colnames(T_monoabund01)
+#colnames(R_monoabund01)
+#colnames(O_monoabund01)
+#colnames(S_monoabund01)
+
+#Let's make our abundance data a 1m^22 one:
+#First, calculate a multiplication factor:
+cm2in1m2 <- 100*100
+cm2inonesquare <- 20*20
+multiplicationfactor <- cm2in1m2/cm2inonesquare
+
+#Then, make a new column with the 1m2 abundance:
+H_monoabund01$Hsqm <- H_monoabund01$H * multiplicationfactor
+B_monoabund01$Bsqm <- B_monoabund01$B * multiplicationfactor
+L_monoabund01$Lsqm <- L_monoabund01$L * multiplicationfactor
+T_monoabund01$Tsqm <- T_monoabund01$T * multiplicationfactor
+R_monoabund01$Rsqm <- R_monoabund01$R * multiplicationfactor
+O_monoabund01$Osqm <- O_monoabund01$O * multiplicationfactor
+S_monoabund01$Ssqm <- S_monoabund01$S * multiplicationfactor
+
+#I now want to check for NAs and delete them:
+H_monoabund01 <- H_monoabund01[!is.na(H_monoabund01$Hsqm) , ]
+B_monoabund01 <- B_monoabund01[!is.na(B_monoabund01$Bsqm) , ] 
+L_monoabund01 <- L_monoabund01[!is.na(L_monoabund01$Lsqm) , ] 
+T_monoabund01 <- T_monoabund01[!is.na(T_monoabund01$Tsqm) , ] 
+R_monoabund01 <- R_monoabund01[!is.na(R_monoabund01$Rsqm) , ] 
+O_monoabund01 <- O_monoabund01[!is.na(O_monoabund01$Osqm) , ] 
+S_monoabund01 <- S_monoabund01[!is.na(S_monoabund01$Ssqm) , ] 
+
+#Summarize DFs for the initial plotting:
+shrunk_H_mono <- H_monoabund01 %>%
+                  group_by(Plot, trt, year) %>%
+                    summarize(mean_abundance = mean(Hsqm))
+
+shrunk_B_mono <- B_monoabund01 %>%
+                  group_by(Plot, trt, year) %>%
+                    summarize(mean_abundance = mean(Bsqm))
+
+shrunk_L_mono <- L_monoabund01 %>%
+                  group_by(Plot, trt, year) %>%
+                    summarize(mean_abundance = mean(Lsqm))
+
+shrunk_T_mono <- T_monoabund01 %>%
+                  group_by(Plot, trt, year) %>%
+                   summarize(mean_abundance = mean(Tsqm))
+
+shrunk_R_mono <- R_monoabund01 %>%
+                  group_by(Plot, trt, year) %>%
+                    summarize(mean_abundance = mean(Rsqm))
+
+shrunk_O_mono <- O_monoabund01 %>%
+                  group_by(Plot, trt, year) %>%
+                    summarize(mean_abundance = mean(Osqm))
+
+shrunk_S_mono <- S_monoabund01 %>%
+                  group_by(Plot, trt, year) %>%
+                    summarize(mean_abundance = mean(Ssqm))
+
+#Now pivot wider, to calculate Nt+1/Nt:
+#Hordeum
+wider_H_mono <- shrunk_H_mono %>%
+                  pivot_wider(names_from = year, 
+                   values_from = mean_abundance)
+
+wider_H_mono$Nt1 <- wider_H_mono$"1"
+wider_H_mono$Nt <- wider_H_mono$"0"
+
+#Filter 0s in Nt:
+wider_H_mono_f <- wider_H_mono %>% filter(Nt != 0)
+#Filter 0s in Nt1:
+wider_H_mono_f <- wider_H_mono_f %>% filter(Nt1 != 0)
+
+#Factor it:
+wider_H_mono_f$trt <- as.factor(wider_H_mono_f$trt)
+
+
+
+#Calculate y-values (Nt+1/Nt):
+wider_H_mono_f$yvalues <- wider_H_mono_f$Nt1/wider_H_mono_f$Nt
+
+#Bromus
+wider_B_mono <- shrunk_B_mono %>%
+  pivot_wider(names_from = year, 
+              values_from = mean_abundance)
+
+wider_B_mono$Nt1 <- wider_B_mono$"1"
+wider_B_mono$Nt <- wider_B_mono$"0"
+
+#Filter 0s:
+wider_B_mono_f <- wider_B_mono %>% filter(Nt != 0)
+wider_B_mono_f <- wider_B_mono_f %>% filter(Nt1 != 0)
+
+wider_B_mono_f$trt <- as.factor(wider_B_mono_f$trt)
+
+#Calculate y-values (Nt+1/Nt):
+wider_B_mono_f$yvalues <- wider_B_mono_f$Nt1/wider_B_mono_f$Nt
+
+#Lotus
+wider_L_mono <- shrunk_L_mono %>%
+  pivot_wider(names_from = year, 
+              values_from = mean_abundance)
+
+wider_L_mono$Nt1 <- wider_L_mono$"1"
+wider_L_mono$Nt <- wider_L_mono$"0"
+
+#Filter 0s:
+wider_L_mono_f <- wider_L_mono %>% filter(Nt != 0)
+wider_L_mono_f <- wider_L_mono_f %>% filter(Nt1 != 0)
+
+wider_L_mono_f$trt <- as.factor(wider_L_mono_f$trt)
+
+#Calculate y-values (Nt+1/Nt):
+wider_L_mono_f$yvalues <- wider_L_mono_f$Nt1/wider_L_mono_f$Nt
+
+#Trifolium
+wider_T_mono <- shrunk_T_mono %>%
+  pivot_wider(names_from = year, 
+              values_from = mean_abundance)
+
+wider_T_mono$Nt1 <- wider_T_mono$"1"
+wider_T_mono$Nt <- wider_T_mono$"0"
+
+#Filter 0s:
+wider_T_mono_f <- wider_T_mono %>% filter(Nt != 0)
+wider_T_mono_f <- wider_T_mono_f %>% filter(Nt1 != 0)
+
+wider_T_mono_f$trt <- as.factor(wider_T_mono_f$trt)
+
+#Calculate y-values (Nt+1/Nt):
+wider_T_mono_f$yvalues <- wider_T_mono_f$Nt1/wider_T_mono_f$Nt
+
+#Rumex
+wider_R_mono <- shrunk_R_mono %>%
+  pivot_wider(names_from = year, 
+              values_from = mean_abundance)
+
+wider_R_mono$Nt1 <- wider_R_mono$"1"
+wider_R_mono$Nt <- wider_R_mono$"0"
+
+#Filter 0s:
+wider_R_mono_f <- wider_R_mono %>% filter(Nt != 0)
+wider_R_mono_f <- wider_R_mono_f %>% filter(Nt1 != 0)
+
+wider_R_mono_f$trt <- as.factor(wider_R_mono_f$trt)
+
+#Calculate y-values (Nt+1/Nt):
+wider_R_mono_f$yvalues <- wider_R_mono_f$Nt1/wider_R_mono_f$Nt
+
+#Ormenis
+wider_O_mono <- shrunk_O_mono %>%
+  pivot_wider(names_from = year, 
+              values_from = mean_abundance)
+
+wider_O_mono$Nt1 <- wider_O_mono$"1"
+wider_O_mono$Nt <- wider_O_mono$"0"
+
+#Filter 0s:
+wider_O_mono_f <- wider_O_mono %>% filter(Nt != 0)
+wider_O_mono_f <- wider_O_mono_f %>% filter(Nt1 != 0)
+
+wider_O_mono_f$trt <- as.factor(wider_O_mono_f$trt)
+
+#Calculate y-values (Nt+1/Nt):
+wider_O_mono_f$yvalues <- wider_O_mono_f$Nt1/wider_O_mono_f$Nt
+
+#Silene
+wider_S_mono <- shrunk_S_mono %>%
+  pivot_wider(names_from = year, 
+              values_from = mean_abundance)
+
+wider_S_mono$Nt1 <- wider_S_mono$"1"
+wider_S_mono$Nt <- wider_S_mono$"0"
+
+#Filter 0s:
+wider_S_mono_f <- wider_S_mono %>% filter(Nt != 0)
+wider_S_mono_f <- wider_S_mono_f %>% filter(Nt1 != 0)
+
+wider_S_mono_f$trt <- as.factor(wider_S_mono_f$trt)
+
+#Calculate y-values (Nt+1/Nt):
+wider_S_mono_f$yvalues <- wider_S_mono_f$Nt1/wider_S_mono_f$Nt
+
+head(wider_R_mono_f)
+
+
+
+```
+
+```{r, label = "Data manipulation, years 2 and 3", echo = FALSE}
+data2 <- read.csv("/Users/yuvalneumann/Documents/mesocosm_Bayes/raw_data/2024 abundance.csv")
+
+abund2 <- data2[, c("Plot", "Dominant", "Dominant_Species", "H", "B", "L",       
+                    "T", "R", "O", "S", "trt", "year")]
+
+abund12 <- rbind(abund1, abund2)
+
+monoabund12 <- subset(abund12, Dominant == 0)
+
+#Subset into seven species DFs:
+H_monoabund12 <- subset(monoabund12, Dominant_Species == "H")
+B_monoabund12 <- subset(monoabund12, Dominant_Species == "B")
+L_monoabund12 <- subset(monoabund12, Dominant_Species == "L")
+T_monoabund12 <- subset(monoabund12, Dominant_Species == "T")
+R_monoabund12 <- subset(monoabund12, Dominant_Species == "R")
+O_monoabund12 <- subset(monoabund12, Dominant_Species == "O")
+S_monoabund12 <- subset(monoabund12, Dominant_Species == "S")
+
+H_monoabund12 <- H_monoabund12[ , -c(2, 3, 5, 6, 7, 8, 9, 10)]
+B_monoabund12 <- B_monoabund12[ , -c(2, 3, 4, 6, 7, 8, 9, 10)]
+L_monoabund12 <- L_monoabund12[ , -c(2, 3, 4, 5, 7, 8, 9, 10)]
+T_monoabund12 <- T_monoabund12[ , -c(2, 3, 4, 5, 6, 8, 9, 10)]
+R_monoabund12 <- R_monoabund12[ , -c(2, 3, 4, 5, 6, 7, 9, 10)]
+O_monoabund12 <- O_monoabund12[ , -c(2, 3, 4, 5, 6, 7, 8, 10)]
+S_monoabund12 <- S_monoabund12[ , -c(2, 3, 4, 5, 6, 7, 8, 9)]
+
+H_monoabund12$Hsqm <- H_monoabund12$H * multiplicationfactor
+B_monoabund12$Bsqm <- B_monoabund12$B * multiplicationfactor
+L_monoabund12$Lsqm <- L_monoabund12$L * multiplicationfactor
+T_monoabund12$Tsqm <- T_monoabund12$T * multiplicationfactor
+R_monoabund12$Rsqm <- R_monoabund12$R * multiplicationfactor
+O_monoabund12$Osqm <- O_monoabund12$O * multiplicationfactor
+S_monoabund12$Ssqm <- S_monoabund12$S * multiplicationfactor
+
+#I now want to check for NAs and delete them:
+H_monoabund12 <- H_monoabund12[!is.na(H_monoabund01$Hsqm) , ]
+B_monoabund12 <- B_monoabund12[!is.na(B_monoabund01$Bsqm) , ] 
+L_monoabund12 <- L_monoabund12[!is.na(L_monoabund01$Lsqm) , ] 
+T_monoabund12 <- T_monoabund12[!is.na(T_monoabund01$Tsqm) , ] 
+R_monoabund12 <- R_monoabund12[!is.na(R_monoabund01$Rsqm) , ] 
+O_monoabund12 <- O_monoabund12[!is.na(O_monoabund01$Osqm) , ] 
+S_monoabund12 <- S_monoabund12[!is.na(S_monoabund01$Ssqm) , ] 
+
+#Summarize DFs for the initial plotting:
+shrunk_H_mono12 <- H_monoabund12 %>%
+                  group_by(Plot, trt, year) %>%
+                    summarize(mean_abundance = mean(Hsqm))
+
+shrunk_B_mono12 <- B_monoabund12 %>%
+                  group_by(Plot, trt, year) %>%
+                    summarize(mean_abundance = mean(Bsqm, na.rm = TRUE))
+
+shrunk_L_mono12 <- L_monoabund12 %>%
+                  group_by(Plot, trt, year) %>%
+                    summarize(mean_abundance = mean(Lsqm))
+
+shrunk_T_mono12 <- T_monoabund12 %>%
+                  group_by(Plot, trt, year) %>%
+                   summarize(mean_abundance = mean(Tsqm))
+
+shrunk_R_mono12 <- R_monoabund12 %>%
+                  group_by(Plot, trt, year) %>%
+                    summarize(mean_abundance = mean(Rsqm))
+
+shrunk_O_mono12 <- O_monoabund12 %>%
+                  group_by(Plot, trt, year) %>%
+                    summarize(mean_abundance = mean(Osqm))
+
+shrunk_S_mono12 <- S_monoabund12 %>%
+                  group_by(Plot, trt, year) %>%
+                    summarize(mean_abundance = mean(Ssqm))
+
+#Hordeum
+wider_H_mono12 <- shrunk_H_mono12 %>%
+                  pivot_wider(names_from = year, 
+                   values_from = mean_abundance)
+
+wider_H_mono12$Nt1 <- wider_H_mono12$"2"
+wider_H_mono12$Nt <- wider_H_mono12$"1"
+
+#Filter 0s in Nt:
+wider_H_mono_f12 <- wider_H_mono12 %>% filter(Nt != 0)
+#Filter 0s in Nt1:
+wider_H_mono_f12 <- wider_H_mono_f12 %>% filter(Nt1 != 0)
+
+#Factor it:
+wider_H_mono_f12$trt <- as.factor(wider_H_mono_f12$trt)
+
+
+
+#Calculate y-values (Nt+1/Nt):
+wider_H_mono_f12$yvalues <- wider_H_mono_f12$Nt1/wider_H_mono_f12$Nt
+
+#Bromus
+wider_B_mono12 <- shrunk_B_mono12 %>%
+  pivot_wider(names_from = year, 
+              values_from = mean_abundance)
+
+wider_B_mono12$Nt1 <- wider_B_mono12$"2"
+wider_B_mono12$Nt <- wider_B_mono12$"1"
+
+#Filter 0s:
+wider_B_mono_f12 <- wider_B_mono12 %>% filter(Nt != 0)
+wider_B_mono_f12 <- wider_B_mono_f12 %>% filter(Nt1 != 0)
+
+wider_B_mono_f12$trt <- as.factor(wider_B_mono_f12$trt)
+
+#Calculate y-values (Nt+1/Nt):
+wider_B_mono_f12$yvalues <- wider_B_mono_f12$Nt1/wider_B_mono_f12$Nt
+
+#Lotus
+wider_L_mono12 <- shrunk_L_mono12 %>%
+  pivot_wider(names_from = year, 
+              values_from = mean_abundance)
+
+wider_L_mono12$Nt1 <- wider_L_mono12$"2"
+wider_L_mono12$Nt <- wider_L_mono12$"1"
+
+#Filter 0s:
+wider_L_mono_f12 <- wider_L_mono12 %>% filter(Nt != 0)
+wider_L_mono_f12 <- wider_L_mono_f12 %>% filter(Nt1 != 0)
+
+wider_L_mono_f12$trt <- as.factor(wider_L_mono_f12$trt)
+
+#Calculate y-values (Nt+1/Nt):
+wider_L_mono_f12$yvalues <- wider_L_mono_f12$Nt1/wider_L_mono_f12$Nt
+
+#Trifolium
+wider_T_mono12 <- shrunk_T_mono12 %>%
+  pivot_wider(names_from = year, 
+              values_from = mean_abundance)
+
+wider_T_mono12$Nt1 <- wider_T_mono12$"2"
+wider_T_mono12$Nt <- wider_T_mono12$"1"
+
+#Filter 0s:
+wider_T_mono_f12 <- wider_T_mono12 %>% filter(Nt != 0)
+wider_T_mono_f12 <- wider_T_mono_f12 %>% filter(Nt1 != 0)
+
+wider_T_mono_f12$trt <- as.factor(wider_T_mono_f12$trt)
+
+#Calculate y-values (Nt+1/Nt):
+wider_T_mono_f12$yvalues <- wider_T_mono_f12$Nt1/wider_T_mono_f12$Nt
+
+#Rumex
+wider_R_mono12 <- shrunk_R_mono12 %>%
+  pivot_wider(names_from = year, 
+              values_from = mean_abundance)
+
+wider_R_mono12$Nt1 <- wider_R_mono12$"2"
+wider_R_mono12$Nt <- wider_R_mono12$"1"
+
+#Filter 0s:
+wider_R_mono_f12 <- wider_R_mono12 %>% filter(Nt != 0)
+wider_R_mono_f12 <- wider_R_mono_f12 %>% filter(Nt1 != 0)
+
+wider_R_mono_f12$trt <- as.factor(wider_R_mono_f12$trt)
+
+#Calculate y-values (Nt+1/Nt):
+wider_R_mono_f12$yvalues <- wider_R_mono_f12$Nt1/wider_R_mono_f12$Nt
+
+#Ormenis
+wider_O_mono12 <- shrunk_O_mono12 %>%
+  pivot_wider(names_from = year, 
+              values_from = mean_abundance)
+
+wider_O_mono12$Nt1 <- wider_O_mono12$"2"
+wider_O_mono12$Nt <- wider_O_mono12$"1"
+
+#Filter 0s:
+wider_O_mono_f12 <- wider_O_mono12 %>% filter(Nt != 0)
+wider_O_mono_f12 <- wider_O_mono_f12 %>% filter(Nt1 != 0)
+
+wider_O_mono_f12$trt <- as.factor(wider_O_mono_f12$trt)
+
+#Calculate y-values (Nt+1/Nt):
+wider_O_mono_f12$yvalues <- wider_O_mono_f12$Nt1/wider_O_mono_f12$Nt
+
+#Silene
+wider_S_mono12 <- shrunk_S_mono12 %>%
+  pivot_wider(names_from = year, 
+              values_from = mean_abundance)
+
+wider_S_mono12$Nt1 <- wider_S_mono12$"2"
+wider_S_mono12$Nt <- wider_S_mono12$"1"
+
+#Filter 0s:
+wider_S_mono_f12 <- wider_S_mono12 %>% filter(Nt != 0)
+wider_S_mono_f12 <- wider_S_mono_f12 %>% filter(Nt1 != 0)
+
+wider_S_mono_f12$trt <- as.factor(wider_S_mono_f12$trt)
+
+#Calculate y-values (Nt+1/Nt):
+wider_S_mono_f12$yvalues <- wider_S_mono_f12$Nt1/wider_S_mono_f12$Nt
+
+head(wider_R_mono_f12)
+```
+
+I will now give each DF a 'year' identifier column. The column will have a singular year value, that is of the year when Nt+1 was sampled. I will then combine each species' 2 DFs into one 3-year DF.
+
+```{r, label = "Combining DFs", echo = FALSE}
+wider_H_mono_f$year <- 2
+wider_B_mono_f$year <- 2
+wider_L_mono_f$year <- 2
+wider_T_mono_f$year <- 2
+wider_R_mono_f$year <- 2
+wider_O_mono_f$year <- 2
+wider_S_mono_f$year <- 2
+
+wider_H_mono_f12$year <- 3
+wider_B_mono_f12$year <- 3
+wider_L_mono_f12$year <- 3
+wider_T_mono_f12$year <- 3
+wider_R_mono_f12$year <- 3
+wider_O_mono_f12$year <- 3
+wider_S_mono_f12$year <- 3
+
+
+H_123 <- rbind(wider_H_mono_f, wider_H_mono_f12)
+H_123 <- H_123[ , c("Nt", "yvalues", "year")]
+
+B_123 <- rbind(wider_B_mono_f, wider_B_mono_f12)
+B_123 <- B_123[ , c("Nt", "yvalues", "year")]
+
+L_123 <- rbind(wider_L_mono_f, wider_L_mono_f12)
+L_123 <- L_123[ , c("Nt", "yvalues", "year")]
+
+T_123 <- rbind(wider_T_mono_f, wider_T_mono_f12)
+T_123 <- T_123[ , c("Nt", "yvalues", "year")]
+
+R_123 <- rbind(wider_R_mono_f, wider_R_mono_f12)
+R_123 <- R_123[ , c("Nt", "yvalues", "year")]
+
+O_123 <- rbind(wider_O_mono_f, wider_O_mono_f12)
+O_123 <- O_123[ , c("Nt", "yvalues", "year")]
+
+S_123 <- rbind(wider_S_mono_f, wider_S_mono_f12)
+S_123 <- S_123[ , c("Nt", "yvalues", "year")]
+
+head(R_123)
+tail(R_123)
+```
